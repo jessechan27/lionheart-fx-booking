@@ -23,3 +23,8 @@
 .instrument-info span{font-size:12px;color:#74747d;font-weight:500}
 .instrument-info strong{font-size:15px;font-weight:650;line-height:1.5;color:#24242a}
 @media(max-width:560px){.instrument-info{grid-template-columns:1fr;gap:8px}.instrument-info>div{padding:11px 14px}}
+
+/* Homepage heading hierarchy: emphasize CMU identity */
+.hero>.eyebrow{font-size:clamp(17px,2.1vw,23px);font-weight:750;letter-spacing:.4px;line-height:1.5;color:#237a50}
+.hero>h1{font-size:clamp(27px,3.1vw,42px);letter-spacing:-1.1px;line-height:1.3;margin:12px 0 20px}
+@media(max-width:700px){.hero>.eyebrow{font-size:clamp(16px,4.3vw,20px)}.hero>h1{font-size:clamp(25px,6.2vw,33px);letter-spacing:-.7px}}
