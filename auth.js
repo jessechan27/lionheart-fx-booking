@@ -6,7 +6,7 @@ const configured=Boolean(cfg.supabaseUrl&&cfg.supabaseAnonKey);
 // GitHub Pages 正式網址：避免從預覽網址或其他路徑註冊時產生錯誤跳轉。
 const authRedirectUrl='https://jessechan27.github.io/lionheart-fx-booking/';
 const client=configured&&window.supabase?window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
-let user=null,profile=null,isAdmin=false,mode='login';
+let user=null,profile=null,profileErrorMessage='',isAdmin=false,mode='login';
 const setMessage=(id,msg,ok=false)=>{const el=$(id);el.textContent=msg;el.style.color=ok?'#147d4a':'#c63838'};
 const notify=()=>{window.dispatchEvent(new CustomEvent('lionheart-auth-change',{detail:{user,profile}}))};
 const openAuth=()=>{if(!client){alert('會員系統尚未啟用。請管理者先設定 Supabase URL 與公開金鑰，並執行最新 supabase.sql。');return}setMode('login');setMessage('authMessage','');$('authDialog').showModal()};
@@ -22,12 +22,14 @@ function setMode(next){
  setMessage('authMessage','');
 }
 async function refresh(){
- if(!client){user=null;profile=null;isAdmin=false;updateUI();notify();return}
+ if(!client){user=null;profile=null;profileErrorMessage='';isAdmin=false;updateUI();notify();return}
  const {data:{user:current},error}=await client.auth.getUser();
- if(error||!current){user=null;profile=null;isAdmin=false;updateUI();notify();return}
+ if(error||!current){user=null;profile=null;profileErrorMessage='';isAdmin=false;updateUI();notify();return}
  user=current;
  const {data,error:profileError}=await client.from('profiles').select('full_name,lab,approval_status').eq('id',user.id).single();
  profile=profileError?null:data;
+ profileErrorMessage=profileError?(profileError.message||'無法讀取會員資料'):'';
+ if(profileError)console.error('Lionheart member profile query failed:',profileError);
  const {data:adminFlag,error:adminError}=await client.rpc('is_lionheart_admin');
  isAdmin=!adminError&&adminFlag===true;
  updateUI();notify();
@@ -92,7 +94,7 @@ $('forgotPassword').onclick=async()=>{
  const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl});
  setMessage('authMessage',error?error.message:'若帳號存在，將收到密碼重設郵件。',!error);
 };
-window.LionheartAuth={client,get user(){return user},get profile(){return profile},get isAdmin(){return isAdmin},openAuth,refresh};
+window.LionheartAuth={client,get user(){return user},get profile(){return profile},get profileError(){return profileErrorMessage},get isAdmin(){return isAdmin},openAuth,refresh};
 if(client){
  client.auth.onAuthStateChange((event)=>{
   if(event==='PASSWORD_RECOVERY'){
