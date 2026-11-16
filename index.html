@@ -28,7 +28,7 @@
 </section>
 <section class="calendar-card">
   <div class="calendar-head">
-    <div><div class="eyebrow">WEEKLY CALENDAR</div><h2>預約行事曆</h2><p>點選空白時段快速預約；點選已預約時段查看資訊。</p></div>
+    <div><div class="eyebrow">WEEKLY CALENDAR</div><h2>預約行事曆</h2><p>點選空白時段選擇連續使用時間；姓名及單位只需填寫一次。</p></div>
     <div class="week-controls"><button class="icon-button" id="prev" aria-label="上一週">‹</button><span id="weekLabel"></span><button class="icon-button" id="next" aria-label="下一週">›</button></div>
   </div>
   <div class="legend"><span><i class="dot free"></i>可預約</span><span><i class="dot booked"></i>已預約</span><span><i class="dot past"></i>已過時間</span></div>
@@ -45,6 +45,12 @@
 <dialog id="bookingDialog"><form id="bookingForm" class="dialog-body">
   <div class="dialog-top"><div><div class="eyebrow">NEW RESERVATION</div><h2>新增儀器預約</h2></div><button type="button" class="close" id="closeBooking" aria-label="關閉">×</button></div>
   <div class="selected" id="selectedSlot"></div>
+  <label>預約日期 <em>*</em><input id="bookingDate" type="date" required></label>
+  <div class="time-range">
+    <label>開始時間 <em>*</em><select id="startTime" required></select></label>
+    <label>結束時間 <em>*</em><select id="endTime" required></select></label>
+  </div>
+  <p class="range-hint" id="rangeHint" aria-live="polite">可選擇同一天連續多個時段，資料只需填寫一次。</p>
   <label>使用者姓名 <em>*</em><input id="name" required maxlength="60" placeholder="請輸入姓名" autocomplete="name"></label>
   <label>所屬實驗室／單位 <em>*</em><input id="lab" required maxlength="100" placeholder="例如：中醫學系 XX 實驗室"></label>
   <label>電子郵件 <em>*</em><input id="email" type="email" required maxlength="150" placeholder="name@example.com" autocomplete="email"></label>
