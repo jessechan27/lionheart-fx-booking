@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5f5f7">
+<meta name="description" content="中醫藥核心平台實驗室 Lionheart FX 儀器預約系統">
+<title>Lionheart FX | 儀器預約系統</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="shell">
+<header class="top">
+  <div class="brand"><div class="brand-icon">✳</div><div><strong>Lionheart FX</strong><small>Core Facility · Instrument Booking</small></div></div>
+  <div class="status" id="status">● 本機示範模式</div>
+</header>
+<main>
+<section class="hero">
+  <div class="eyebrow">中醫藥核心平台實驗室 · INSTRUMENT RESERVATION</div>
+  <h1>Lionheart FX 儀器預約系統</h1>
+  <p>網站管理者：Dr. Shih-Hsuan (James) Chan</p>
+  <div class="hero-actions"><button class="primary" id="openBooking">＋ 新增預約</button><button class="secondary" id="today">返回本週</button></div>
+</section>
+<section class="overview">
+  <div class="metric"><span>儀器</span><b>Lionheart FX</b><small>BioTek · Imaging</small></div>
+  <div class="metric"><span>開放時間</span><b>08:00–20:00</b><small>週一至週日</small></div>
+  <div class="metric"><span>本週預約</span><b id="weeklyCount">0 筆</b><small id="weekRange">—</small></div>
+</section>
+<section class="calendar-card">
+  <div class="calendar-head">
+    <div><div class="eyebrow">WEEKLY CALENDAR</div><h2>預約行事曆</h2><p>點選空白時段快速預約；點選已預約時段查看資訊。</p></div>
+    <div class="week-controls"><button class="icon-button" id="prev" aria-label="上一週">‹</button><span id="weekLabel"></span><button class="icon-button" id="next" aria-label="下一週">›</button></div>
+  </div>
+  <div class="legend"><span><i class="dot free"></i>可預約</span><span><i class="dot booked"></i>已預約</span><span><i class="dot past"></i>已過時間</span></div>
+  <div class="mobile-day-nav" id="mobileDayNav" aria-label="選擇星期"></div>
+  <div class="table-scroll"><div id="calendar" class="calendar" aria-label="週預約時段表"></div></div>
+</section>
+<footer>
+  <div>✳ Lionheart FX Booking System</div>
+  <span>管理單位｜中醫藥核心平台實驗室 · 網站管理者：Dr. Shih-Hsuan (James) Chan</span>
+  <span>© <span id="year"></span> Core Facility</span>
+</footer>
+</main>
+</div>
+<dialog id="bookingDialog"><form id="bookingForm" class="dialog-body">
+  <div class="dialog-top"><div><div class="eyebrow">NEW RESERVATION</div><h2>新增儀器預約</h2></div><button type="button" class="close" id="closeBooking" aria-label="關閉">×</button></div>
+  <div class="selected" id="selectedSlot"></div>
+  <label>使用者姓名 <em>*</em><input id="name" required maxlength="60" placeholder="請輸入姓名" autocomplete="name"></label>
+  <label>所屬實驗室／單位 <em>*</em><input id="lab" required maxlength="100" placeholder="例如：中醫學系 XX 實驗室"></label>
+  <label>電子郵件 <em>*</em><input id="email" type="email" required maxlength="150" placeholder="name@example.com" autocomplete="email"></label>
+  <label>實驗備註（選填）<textarea id="notes" maxlength="500" rows="3" placeholder="例如：細胞影像拍攝"></textarea></label>
+  <div class="form-message" id="formMessage" role="status"></div>
+  <div class="dialog-actions"><button type="button" class="secondary" id="cancelBooking">取消</button><button type="submit" class="primary" id="submitBooking">確認預約</button></div>
+</form></dialog>
+<dialog id="detailDialog"><div class="dialog-body">
+  <div class="dialog-top"><div><div class="eyebrow">RESERVATION DETAILS</div><h2>預約資訊</h2></div><button type="button" class="close" id="closeDetail" aria-label="關閉">×</button></div>
+  <div id="detailBody"></div>
+  <div class="dialog-actions"><button class="secondary" id="dismissDetail">關閉</button></div>
+</div></dialog>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
