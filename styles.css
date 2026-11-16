@@ -6,3 +6,13 @@
 .dialog-body select:focus{border-color:#0071e3;box-shadow:0 0 0 3px #0071e319}
 .range-hint{font-size:12px;line-height:1.6;color:#6e6e73;margin:0 0 12px}
 @media(max-width:390px){.time-range{gap:8px}.dialog-body select{padding:10px 7px}}
+
+/* Member authentication and profile */
+[hidden]{display:none!important}
+.account-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.account-actions .secondary{padding:10px 14px;border-radius:11px;font-size:12px}
+.user-badge{font-size:12px;font-weight:650;color:#1965b1;background:#e9f3ff;border-radius:30px;padding:10px 13px}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;background:#f3f3f6;padding:5px;border-radius:13px;margin:0 0 22px}
+.auth-tab{border:0;border-radius:10px;background:transparent;padding:12px;font-size:14px;font-weight:650;color:#777}
+.auth-tab.active{background:#fff;color:#0071e3;box-shadow:0 1px 6px #00000012}
+@media(max-width:700px){.top{align-items:flex-start}.account-actions{max-width:55%;gap:6px}.account-actions .status{max-width:100%;white-space:normal;text-align:right}.account-actions .secondary{padding:8px 10px}.user-badge{padding:7px 9px}.auth-tabs{margin-top:4px}}
