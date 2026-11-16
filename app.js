@@ -7,9 +7,22 @@ const localDate=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())
 const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 function startMonday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-(x.getDay()+6)%7);return x}
 const readable=d=>`${d.getMonth()+1}/${d.getDate()}`;
+const timeOptions=(select,min,max)=>{select.replaceChildren();for(let h=min;h<=max;h++){const opt=document.createElement('option');opt.value=String(h);opt.textContent=`${pad(h)}:00`;select.append(opt)}};
+timeOptions($('startTime'),8,19);timeOptions($('endTime'),9,20);
+function updateRange(){
+ const date=$('bookingDate').value,start=Number($('startTime').value),end=Number($('endTime').value);
+ const valid=date&&start>=8&&start<20&&end>start&&end<=20;
+ const conflicts=valid?bookings.filter(b=>b.booking_date===date&&b.start_hour>=start&&b.start_hour<end):[];
+ const inPast=valid&&new Date(`${date}T${pad(start)}:00:00`).getTime()<=Date.now();
+ $('selectedSlot').textContent=valid?`${date} · ${pad(start)}:00–${pad(end)}:00（${end-start} 小時）`:'請選擇有效的時間範圍';
+ $('rangeHint').textContent=!valid?'結束時間必須晚於開始時間。':inPast?'無法預約已過去的時段。':conflicts.length?`所選時間有 ${conflicts.length} 個時段已被預約，請調整時間。`:`將一次預約 ${end-start} 個連續小時，資料只需填寫一次。`;
+ $('rangeHint').style.color=(!valid||inPast||conflicts.length)?'#c63838':'#6e6e73';
+ return {valid:!!valid&&!inPast&&!conflicts.length,date,start,end};
+}
+for(const id of ['bookingDate','startTime','endTime'])$(id).addEventListener('change',updateRange);
 const headers=()=>({'apikey':cfg.supabaseAnonKey,'Authorization':`Bearer ${cfg.supabaseAnonKey}`,'Content-Type':'application/json'});
 async function api(path,options={}){
- const res=await fetch(`${cfg.supabaseUrl.replace(/\/$/,'')}/rest/v1/${path}`,{...options,headers:{...headers(),...(options.headers||{})}});
+ const res=await fetch(`${cfg.supabaseUrl.replace(/\/$/,'')}/${path.startsWith('rpc/')?'rest/v1/':'rest/v1/'}${path}`,{...options,headers:{...headers(),...(options.headers||{})}});
  if(!res.ok){let data;try{data=await res.json()}catch{data={}}throw Error(data.message||data.details||`伺服器錯誤 ${res.status}`)}
  return res.status===204?null:res.json();
 }
@@ -66,8 +79,10 @@ function render(){
 }
 function openBooking(date,h){
  selected={booking_date:date,start_hour:h};
- $('selectedSlot').textContent=`${date}  ·  ${pad(h)}:00–${pad(h+1)}:00`;
- $('formMessage').textContent='';$('bookingForm').reset();$('bookingDialog').showModal();
+ $('formMessage').textContent='';$('bookingForm').reset();
+ $('bookingDate').min=localDate(new Date());$('bookingDate').max=localDate(addDays(new Date(),90));
+ $('bookingDate').value=date;$('startTime').value=String(h);$('endTime').value=String(h+1);
+ updateRange();$('bookingDialog').showModal();
 }
 function showDetail(b){
  const body=$('detailBody');body.replaceChildren();
@@ -79,20 +94,29 @@ function showDetail(b){
 }
 async function save(e){
  e.preventDefault();if(!selected)return;
- const record={...selected,name:$('name').value.trim(),lab:$('lab').value.trim(),email:$('email').value.trim(),notes:$('notes').value.trim()};
+ const range=updateRange();
+ if(!range.valid){$('formMessage').textContent='請調整日期及時間，確認整段時間都可以預約。';return}
+ const record={booking_date:range.date,start_hour:range.start,name:$('name').value.trim(),lab:$('lab').value.trim(),email:$('email').value.trim(),notes:$('notes').value.trim()};
  if(!record.name||!record.lab||!record.email)return;
  $('submitBooking').disabled=true;$('formMessage').textContent='';
  try{
-  if(online){await api('bookings',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(record)})}
-  else{
+  if(online){
+   await api('rpc/create_booking_range',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({
+    p_date:range.date,p_start:range.start,p_end:range.end,p_name:record.name,p_lab:record.lab,p_email:record.email,p_notes:record.notes
+   })});
+  }else{
    const all=JSON.parse(localStorage.getItem(storageKey)||'[]');
-   if(all.some(b=>b.booking_date===record.booking_date&&b.start_hour===record.start_hour))throw Error('此時段已被預約，請重新整理');
-   all.push({...record,id:crypto.randomUUID()});localStorage.setItem(storageKey,JSON.stringify(all));
+   const conflict=all.some(b=>b.booking_date===range.date&&b.start_hour>=range.start&&b.start_hour<range.end);
+   if(conflict)throw Error('所選時間內已有其他預約');
+   const batch=Array.from({length:range.end-range.start},(_,i)=>({...record,start_hour:range.start+i,id:crypto.randomUUID()}));
+   localStorage.setItem(storageKey,JSON.stringify([...all,...batch]));
   }
-  $('bookingDialog').close();await load();
+  $('bookingDialog').close();
+  monday=startMonday(new Date(range.date+'T12:00:00'));activeDay=(new Date(range.date+'T12:00:00').getDay()+6)%7;
+  await load();
  }catch(err){
-  $('formMessage').textContent=err.message.includes('duplicate')||err.message.includes('unique')?'此時段已被其他使用者預約，請選擇其他時間。':`預約失敗：${err.message}`;
-  await load().catch(()=>{});
+  $('formMessage').textContent=/duplicate|unique|conflict|already|已被|已有|時段衝突/i.test(err.message)?'所選時間已有預約，請調整起訖時間。':`預約失敗：${err.message}`;
+  await load().catch(()=>{});updateRange();
  }finally{$('submitBooking').disabled=false}
 }
 $('bookingForm').addEventListener('submit',save);
