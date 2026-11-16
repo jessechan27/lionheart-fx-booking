@@ -65,3 +65,94 @@ end;
 $$;
 revoke all on function public.create_booking_range(date,integer,integer,text,text,text,text) from public;
 grant execute on function public.create_booking_range(date,integer,integer,text,text,text,text) to anon;
+
+-- ===============================================================
+-- 會員制升級（請在 Supabase SQL Editor 執行完整檔案）
+-- ===============================================================
+create table if not exists public.profiles (
+ id uuid primary key references auth.users(id) on delete cascade,
+ full_name text not null check (char_length(trim(full_name)) between 1 and 60),
+ lab text not null check (char_length(trim(lab)) between 1 and 100),
+ updated_at timestamptz not null default now()
+);
+alter table public.profiles enable row level security;
+revoke all on public.profiles from anon,authenticated;
+grant select (id,full_name,lab), update (full_name,lab) on public.profiles to authenticated;
+drop policy if exists "Members view own profile" on public.profiles;
+create policy "Members view own profile" on public.profiles for select to authenticated using ((select auth.uid())=id);
+drop policy if exists "Members update own profile" on public.profiles;
+create policy "Members update own profile" on public.profiles for update to authenticated using ((select auth.uid())=id) with check ((select auth.uid())=id);
+
+create or replace function public.create_member_profile()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+begin
+ insert into public.profiles(id,full_name,lab)
+ values (
+  new.id,
+  left(coalesce(nullif(trim(new.raw_user_meta_data->>'full_name'),''),'未填寫姓名'),60),
+  left(coalesce(nullif(trim(new.raw_user_meta_data->>'lab'),''),'未填寫實驗室'),100)
+ );
+ return new;
+end;
+$$;
+drop trigger if exists on_lionheart_user_created on auth.users;
+create trigger on_lionheart_user_created after insert on auth.users
+for each row execute function public.create_member_profile();
+-- 針對在啟用觸發器前就已建立的會員補建個人資料。
+insert into public.profiles(id,full_name,lab)
+select id,
+ left(coalesce(nullif(trim(raw_user_meta_data->>'full_name'),''),'未填寫姓名'),60),
+ left(coalesce(nullif(trim(raw_user_meta_data->>'lab'),''),'未填寫實驗室'),100)
+from auth.users on conflict(id) do nothing;
+
+alter table public.bookings add column if not exists user_id uuid references auth.users(id) on delete set null;
+create index if not exists bookings_user_idx on public.bookings(user_id);
+
+-- 禁止匿名訪客新增或讀取預約；僅登入會員可讀公開預約資訊。
+drop policy if exists "Public may view bookings" on public.bookings;
+drop policy if exists "Public may create future bookings" on public.bookings;
+revoke all on public.bookings from anon,authenticated;
+grant select (id,booking_date,start_hour,name,lab,notes,user_id) on public.bookings to authenticated;
+drop policy if exists "Authenticated users view bookings" on public.bookings;
+create policy "Authenticated users view bookings" on public.bookings for select to authenticated using (true);
+-- 不授予 authenticated 對 bookings 的直接 INSERT 權限。
+-- 撤銷舊版匿名多時段函式權限，避免繞過會員制。
+revoke all on function public.create_booking_range(date,integer,integer,text,text,text,text) from public,anon,authenticated;
+
+create or replace function public.create_member_booking_range(
+ p_date date,p_start integer,p_end integer,p_notes text default ''
+) returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+ v_user uuid := (select auth.uid());
+ v_name text;
+ v_lab text;
+ v_email text;
+begin
+ if v_user is null then raise exception 'Login required'; end if;
+ select full_name,lab into v_name,v_lab from public.profiles where id=v_user;
+ if v_name is null or v_lab is null then raise exception 'Member profile not found'; end if;
+ select email into v_email from auth.users where id=v_user;
+ if v_email is null then raise exception 'Email not found'; end if;
+ if p_date is null or p_start is null or p_end is null or p_start<8 or p_end>20 or p_start>=p_end then
+  raise exception 'Invalid booking range';
+ end if;
+ if length(coalesce(p_notes,''))>500 then raise exception 'Notes too long'; end if;
+ if (p_date + pg_catalog.make_interval(hours => p_start)) <= (now() at time zone 'Asia/Taipei')
+    or p_date > ((now() at time zone 'Asia/Taipei')::date + 90) then
+  raise exception 'Booking must be in the future and within 90 days';
+ end if;
+ perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('lionheart_fx'),(p_date - date '2000-01-01')::integer);
+ if exists(select 1 from public.bookings where booking_date=p_date and start_hour>=p_start and start_hour<p_end) then
+  raise exception 'Booking conflict';
+ end if;
+ insert into public.bookings (booking_date,start_hour,name,lab,email,notes,user_id)
+ select p_date,h,v_name,v_lab,v_email,coalesce(p_notes,''),v_user
+ from pg_catalog.generate_series(p_start,p_end-1) as h;
+end;
+$$;
+revoke all on function public.create_member_booking_range(date,integer,integer,text) from public,anon;
+grant execute on function public.create_member_booking_range(date,integer,integer,text) to authenticated;
+-- 舊版歷史預約仍保留；user_id 對既有資料可能為 NULL。
