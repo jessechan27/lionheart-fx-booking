@@ -12,7 +12,7 @@
 <div class="shell">
 <header class="top">
   <div class="brand"><div class="brand-icon">✳</div><div><strong>Lionheart FX</strong><small>Core Facility · Instrument Booking</small></div></div>
-  <div class="status" id="status">● 本機示範模式</div>
+  <div class="account-actions"><div class="status" id="status">● 連線檢查中</div><span id="userBadge" class="user-badge" hidden></span><button id="accountButton" class="secondary" type="button">登入 / 註冊</button><button id="logoutButton" class="secondary" type="button" hidden>登出</button></div>
 </header>
 <main>
 <section class="hero">
@@ -51,9 +51,7 @@
     <label>結束時間 <em>*</em><select id="endTime" required></select></label>
   </div>
   <p class="range-hint" id="rangeHint" aria-live="polite">可選擇同一天連續多個時段，資料只需填寫一次。</p>
-  <label>使用者姓名 <em>*</em><input id="name" required maxlength="60" placeholder="請輸入姓名" autocomplete="name"></label>
-  <label>所屬實驗室／單位 <em>*</em><input id="lab" required maxlength="100" placeholder="例如：中醫學系 XX 實驗室"></label>
-  <label>電子郵件 <em>*</em><input id="email" type="email" required maxlength="150" placeholder="name@example.com" autocomplete="email"></label>
+  <div class="selected" id="bookingMember">請先登入會員</div>
   <label>實驗備註（選填）<textarea id="notes" maxlength="500" rows="3" placeholder="例如：細胞影像拍攝"></textarea></label>
   <div class="form-message" id="formMessage" role="status"></div>
   <div class="dialog-actions"><button type="button" class="secondary" id="cancelBooking">取消</button><button type="submit" class="primary" id="submitBooking">確認預約</button></div>
@@ -63,7 +61,31 @@
   <div id="detailBody"></div>
   <div class="dialog-actions"><button class="secondary" id="dismissDetail">關閉</button></div>
 </div></dialog>
-<script src="config.js"></script>
-<script src="app.js"></script>
+<dialog id="authDialog"><div class="dialog-body">
+  <div class="dialog-top"><div><div class="eyebrow">MEMBER ACCESS</div><h2 id="authTitle">會員登入</h2></div><button class="close" type="button" id="closeAuth" aria-label="關閉">×</button></div>
+  <div class="auth-tabs"><button type="button" id="tabLogin" class="auth-tab active">登入</button><button type="button" id="tabRegister" class="auth-tab">註冊</button></div>
+  <form id="authForm">
+    <div id="registerFields" hidden>
+      <label>姓名 <em>*</em><input id="regName" maxlength="60" autocomplete="name" placeholder="請輸入真實姓名"></label>
+      <label>所屬實驗室／單位 <em>*</em><input id="regLab" maxlength="100" placeholder="例如：中醫學系 XX 實驗室"></label>
+    </div>
+    <label>Email <em>*</em><input id="authEmail" type="email" required autocomplete="email" placeholder="name@example.com"></label>
+    <label>密碼 <em>*</em><input id="authPassword" type="password" required minlength="6" autocomplete="current-password" placeholder="至少 6 個字元"></label>
+    <div class="form-message" id="authMessage" role="status"></div>
+    <div class="dialog-actions"><button type="button" class="secondary" id="forgotPassword">忘記密碼</button><button type="submit" class="primary" id="authSubmit">登入</button></div>
+  </form>
+</div></dialog>
+<dialog id="profileDialog"><form id="profileForm" class="dialog-body">
+  <div class="dialog-top"><div><div class="eyebrow">MEMBER PROFILE</div><h2>我的會員資料</h2></div><button class="close" type="button" id="closeProfile" aria-label="關閉">×</button></div>
+  <label>姓名 <em>*</em><input id="profileName" required maxlength="60"></label>
+  <label>所屬實驗室／單位 <em>*</em><input id="profileLab" required maxlength="100"></label>
+  <div class="selected" id="profileEmail"></div>
+  <div class="form-message" id="profileMessage" role="status"></div>
+  <div class="dialog-actions"><button class="secondary" type="button" id="cancelProfile">取消</button><button class="primary" type="submit">儲存資料</button></div>
+</form></dialog>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+<script src="config.js" defer></script>
+<script src="auth.js" defer></script>
+<script src="app.js" defer></script>
 </body>
 </html>
