@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f5f5f7"><title>Lionheart FX | 管理者後台</title>
+<link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="admin.css"></head>
+<body><div class="shell">
+<header class="top"><div class="brand"><div class="brand-icon">✳</div><div><strong>Lionheart FX</strong><small>Administration Console</small></div></div><div class="account-actions"><a class="secondary admin-back" href="index.html">返回預約網站</a><button id="adminLogout" class="secondary" hidden>登出</button></div></header>
+<main>
+<section class="admin-intro"><div class="eyebrow">CORE FACILITY · ADMINISTRATION</div><h1>儀器管理後台</h1><p>會員審核、實驗室使用時數、預約紀錄管理</p><p class="admin-note">網站管理者：Dr. Shih-Hsuan (James) Chan</p></section>
+<section class="admin-card" id="adminGate"><h2>管理者登入</h2><p id="gateMessage">請使用具有管理權限的會員帳號登入。</p>
+<form id="adminLogin" class="admin-login"><label>Email<input type="email" id="adminEmail" required autocomplete="email"></label><label>密碼<input type="password" id="adminPassword" required autocomplete="current-password"></label><button class="primary" type="submit">登入後台</button></form>
+</section>
+<section id="adminDashboard" hidden>
+<div class="admin-toolbar"><div class="date-filters"><label>統計開始日期<input type="date" id="dateFrom"></label><label>結束日期<input type="date" id="dateTo"></label><button id="refreshAdmin" class="primary">更新資料</button></div><span id="adminStatus" role="status"></span></div>
+<div class="admin-metrics"><div class="metric"><span>待審核會員</span><b id="pendingCount">—</b><small>等待管理者核准</small></div><div class="metric"><span>統計期間使用時數</span><b id="totalHours">—</b><small>每小時預約紀錄計算</small></div><div class="metric"><span>使用實驗室</span><b id="labCount">—</b><small>統計期間內</small></div></div>
+<div class="admin-card"><div class="admin-section-head"><div><div class="eyebrow">MEMBER APPROVAL</div><h2>會員審核</h2></div><select id="memberFilter" aria-label="會員狀態篩選"><option value="all">全部會員</option><option value="pending">待審核</option><option value="approved">已核准</option><option value="rejected">已拒絕</option></select></div><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>會員</th><th>實驗室</th><th>Email</th><th>狀態</th><th>管理</th></tr></thead><tbody id="memberRows"></tbody></table></div></div>
+<div class="admin-card"><div class="admin-section-head"><div><div class="eyebrow">INSTRUMENT UTILIZATION</div><h2>各實驗室使用時數</h2></div><button class="secondary" id="exportUsage">匯出 CSV</button></div><div id="usageBars" class="usage-bars"></div><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>實驗室</th><th>使用時數</th><th>使用者人數</th><th>占比</th></tr></thead><tbody id="usageRows"></tbody></table></div></div>
+<div class="admin-card"><div class="admin-section-head"><div><div class="eyebrow">RESERVATION MANAGEMENT</div><h2>預約紀錄管理</h2></div><button class="secondary" id="exportBookings">匯出 CSV</button></div><p class="admin-note">可取消單一小時，或取消同一次連續預約的全部時段。取消後時段會重新開放。</p><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>日期</th><th>時段</th><th>使用者</th><th>實驗室</th><th>備註</th><th>管理</th></tr></thead><tbody id="bookingRows"></tbody></table></div></div>
+</section>
+<footer><span>中醫藥核心平台實驗室 · Lionheart FX</span><span>僅限授權管理者存取</span></footer>
+</main></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script><script src="config.js" defer></script><script src="admin.js" defer></script>
+</body></html>
