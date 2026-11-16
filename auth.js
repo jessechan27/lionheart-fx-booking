@@ -4,7 +4,7 @@ const $=id=>document.getElementById(id);
 const cfg=window.LIONHEART_CONFIG||{};
 const configured=Boolean(cfg.supabaseUrl&&cfg.supabaseAnonKey);
 const client=configured&&window.supabase?window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
-let user=null,profile=null,mode='login';
+let user=null,profile=null,isAdmin=false,mode='login';
 const setMessage=(id,msg,ok=false)=>{const el=$(id);el.textContent=msg;el.style.color=ok?'#147d4a':'#c63838'};
 const notify=()=>{window.dispatchEvent(new CustomEvent('lionheart-auth-change',{detail:{user,profile}}))};
 const openAuth=()=>{if(!client){alert('會員系統尚未啟用。請管理者先設定 Supabase URL 與公開金鑰，並執行最新 supabase.sql。');return}setMode('login');setMessage('authMessage','');$('authDialog').showModal()};
@@ -20,20 +20,23 @@ function setMode(next){
  setMessage('authMessage','');
 }
 async function refresh(){
- if(!client){user=null;profile=null;updateUI();notify();return}
+ if(!client){user=null;profile=null;isAdmin=false;updateUI();notify();return}
  const {data:{user:current},error}=await client.auth.getUser();
- if(error||!current){user=null;profile=null;updateUI();notify();return}
+ if(error||!current){user=null;profile=null;isAdmin=false;updateUI();notify();return}
  user=current;
- const {data,error:profileError}=await client.from('profiles').select('full_name,lab').eq('id',user.id).single();
+ const {data,error:profileError}=await client.from('profiles').select('full_name,lab,approval_status').eq('id',user.id).single();
  profile=profileError?null:data;
+ const {data:adminFlag,error:adminError}=await client.rpc('is_lionheart_admin');
+ isAdmin=!adminError&&adminFlag===true;
  updateUI();notify();
 }
 function updateUI(){
+ $('adminLink').hidden=!isAdmin;
  $('userBadge').hidden=!user;
  $('logoutButton').hidden=!user;
  $('accountButton').textContent=user?'我的資料':'登入 / 註冊';
  $('userBadge').textContent=profile?profile.full_name:'已登入';
- $('status').textContent=!client?'● 尚未設定會員資料庫':user?'● 已登入 · 雲端同步':'● 請登入會員';
+ $('status').textContent=!client?'● 尚未設定會員資料庫':!user?'● 請登入會員':isAdmin?'● 管理者已登入':profile?.approval_status==='approved'?'● 會員已核准':profile?.approval_status==='rejected'?'● 會員未通過審核':'● 會員待審核';
 }
 async function submitAuth(e){
  e.preventDefault();if(!client)return;
@@ -87,7 +90,7 @@ $('forgotPassword').onclick=async()=>{
  const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
  setMessage('authMessage',error?error.message:'若帳號存在，將收到密碼重設郵件。',!error);
 };
-window.LionheartAuth={client,get user(){return user},get profile(){return profile},openAuth,refresh};
+window.LionheartAuth={client,get user(){return user},get profile(){return profile},get isAdmin(){return isAdmin},openAuth,refresh};
 if(client){
  client.auth.onAuthStateChange((event)=>{
   if(event==='PASSWORD_RECOVERY'){
