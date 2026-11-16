@@ -50,3 +50,31 @@ https://jessechan27.github.io/lionheart-fx-booking/
 - 舊版匿名新增權限已撤銷；既有歷史預約保留。
 - 預約仍以每小時一列儲存，整段時間在同一資料庫交易內建立，遇到衝突全部回滾。
 - 若尚未設定 Supabase，會員功能會顯示未設定狀態，無法新增預約；不再使用本機示範資料。
+
+
+## 管理者後台（2026-11）
+進入 `admin.html`：https://jessechan27.github.io/lionheart-fx-booking/admin.html
+
+功能：
+- 審核會員：待審核／核准／拒絕／停用；未核准者無法新增預約。
+- 依日期範圍統計各實驗室預約使用時數（每小時紀錄算 1 小時）與使用者人數；可匯出 CSV。
+- 查看預約紀錄，取消單一小時或同一批連續預約的所有小時；可匯出 CSV。
+- 僅 `admin_users` 內的授權管理者可使用後台，伺服器端 RPC 每次都驗證權限。
+
+**必要部署步驟：**
+1. 先確認原本 `supabase.sql` 已執行，且 `config.js` 已填寫 Supabase URL 與公開 anon/publishable key。
+2. 在 Supabase SQL Editor 執行 **`admin_migration.sql`**（不是只更新前端）。
+3. 管理者先在網站註冊並完成 Email 驗證。
+4. 在 Supabase SQL Editor 以專案管理權限執行以下 SQL，將該帳號設為第一位管理員：
+
+```sql
+insert into public.admin_users(user_id)
+select id from auth.users where email = 'YOUR_ADMIN_EMAIL@example.com'
+on conflict (user_id) do nothing;
+```
+
+將示例 Email 換成您註冊使用的 Email。管理員權限**不可**由前端註冊自行取得。
+5. 重新登入網站，首頁會顯示「管理後台」連結。打開 `admin.html` 以管理者帳號登入。
+6. 測試一般會員註冊後為待審核、管理員核准後才能預約；測試報表及取消預約。
+
+**注意：** 未設定 Supabase 或尚未執行管理者 migration 時，後台不會正常運作。管理者後台的權限判斷在資料庫執行，並非只靠隱藏前端按鈕。既有會員預設為待審核，須逐一核准。取消預約為刪除紀錄，目前未提供稽核日誌或復原功能。使用時數為預約時數，非實際儀器運轉紀錄。
