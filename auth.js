@@ -3,6 +3,8 @@
 const $=id=>document.getElementById(id);
 const cfg=window.LIONHEART_CONFIG||{};
 const configured=Boolean(cfg.supabaseUrl&&cfg.supabaseAnonKey);
+// GitHub Pages 正式網址：避免從預覽網址或其他路徑註冊時產生錯誤跳轉。
+const authRedirectUrl='https://jessechan27.github.io/lionheart-fx-booking/';
 const client=configured&&window.supabase?window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
 let user=null,profile=null,isAdmin=false,mode='login';
 const setMessage=(id,msg,ok=false)=>{const el=$(id);el.textContent=msg;el.style.color=ok?'#147d4a':'#c63838'};
@@ -46,7 +48,7 @@ async function submitAuth(e){
   if(mode==='register'){
    const name=$('regName').value.trim(),lab=$('regLab').value.trim();
    if(!name||!lab)throw Error('請填寫姓名與實驗室資訊。');
-   const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname,data:{full_name:name,lab}}});
+   const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:authRedirectUrl,data:{full_name:name,lab}}});
    if(error)throw error;
    if(data.session){$('authDialog').close();await refresh()}
    else setMessage('authMessage','註冊成功！請到信箱點選驗證連結，再返回登入。',true);
@@ -87,7 +89,7 @@ $('forgotPassword').onclick=async()=>{
  if(!client)return;
  const email=$('authEmail').value.trim();
  if(!email){setMessage('authMessage','請先輸入 Email，再點選忘記密碼。');return}
- const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+ const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl});
  setMessage('authMessage',error?error.message:'若帳號存在，將收到密碼重設郵件。',!error);
 };
 window.LionheartAuth={client,get user(){return user},get profile(){return profile},get isAdmin(){return isAdmin},openAuth,refresh};
@@ -99,6 +101,15 @@ if(client){
   }
   if(['SIGNED_IN','SIGNED_OUT','USER_UPDATED','TOKEN_REFRESHED','INITIAL_SESSION'].includes(event))setTimeout(()=>refresh().catch(console.error),0);
  });
+}
+// 回到 GitHub Pages 後顯示驗證結果；不在畫面上揭露驗證 token。
+const callbackParams=new URLSearchParams(location.hash.replace(/^#/,''));
+const queryParams=new URLSearchParams(location.search);
+const callbackError=callbackParams.get('error_description')||queryParams.get('error_description');
+if(callbackError){
+ setTimeout(()=>alert('Email 驗證或密碼重設未完成：'+callbackError.replace(/\\+/g,' ')),100);
+}else if(callbackParams.get('access_token')||queryParams.get('code')){
+ setTimeout(()=>{const params=new URLSearchParams(location.search);params.delete('code');params.delete('type');history.replaceState(null,'',location.pathname+(params.toString()?'?'+params:''));},1500);
 }
 refresh().catch(console.error);
 })();
