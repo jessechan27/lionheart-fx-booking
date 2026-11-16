@@ -4,8 +4,9 @@ const $=id=>document.getElementById(id),cfg=window.LIONHEART_CONFIG||{};
 const client=cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase?window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey):null;
 let members=[],usage=[],bookings=[],authorized=false;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
-const startMonth=()=>today().slice(0,7)+'-01';
-$('dateFrom').value=startMonth();$('dateTo').value=today();
+const dateOffset=days=>{const d=new Date();d.setDate(d.getDate()+days);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+// 管理預約時預設顯示未來 90 天，避免未來預約被「本月到今天」的範圍排除。
+$('dateFrom').value=today();$('dateTo').value=dateOffset(90);
 const setStatus=(msg,error=false)=>{$('adminStatus').textContent=msg;$('adminStatus').style.color=error?'#bf3535':'#6e6e73'};
 const cell=(row,value)=>{const el=document.createElement('td');el.textContent=value==null?'':String(value);row.append(el);return el};
 const button=(label,fn,variant='secondary')=>{const b=document.createElement('button');b.type='button';b.className=variant+' admin-small';b.textContent=label;b.onclick=fn;return b};
