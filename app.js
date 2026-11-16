@@ -74,7 +74,7 @@ function render(){
 }
 function openBooking(date,h){
  if(!auth.user){auth.openAuth();return}
- if(!auth.profile){alert('尚未取得會員資料，請確認已完成 Email 驗證，或重新登入。');return}
+ if(!auth.profile){alert('已登入，但無法讀取會員資料。'+(auth.profileError?'\n資料庫錯誤：'+auth.profileError:'\n請重新整理頁面，或聯絡管理者。'));return}
  if(auth.profile.approval_status!=='approved'&&!auth.isAdmin){alert('您的會員帳號尚未獲管理者核准，目前無法預約儀器。');return}
  selected={booking_date:date,start_hour:h};
  $('formMessage').textContent='';$('bookingForm').reset();
