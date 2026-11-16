@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const $=id=>document.getElementById(id),cfg=window.LIONHEART_CONFIG||{},online=Boolean(cfg.supabaseUrl&&cfg.supabaseAnonKey),storageKey='lionheart_fx_bookings_v1';
+const $=id=>document.getElementById(id),auth=window.LionheartAuth,client=auth?.client,online=Boolean(client);
 let monday=startMonday(new Date()),bookings=[],selected=null,activeDay=(new Date().getDay()+6)%7;
 const days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],pad=n=>String(n).padStart(2,'0');
 const localDate=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -20,17 +20,12 @@ function updateRange(){
  return {valid:!!valid&&!inPast&&!conflicts.length,date,start,end};
 }
 for(const id of ['bookingDate','startTime','endTime'])$(id).addEventListener('change',updateRange);
-const headers=()=>({'apikey':cfg.supabaseAnonKey,'Authorization':`Bearer ${cfg.supabaseAnonKey}`,'Content-Type':'application/json'});
-async function api(path,options={}){
- const res=await fetch(`${cfg.supabaseUrl.replace(/\/$/,'')}/${path.startsWith('rpc/')?'rest/v1/':'rest/v1/'}${path}`,{...options,headers:{...headers(),...(options.headers||{})}});
- if(!res.ok){let data;try{data=await res.json()}catch{data={}}throw Error(data.message||data.details||`伺服器錯誤 ${res.status}`)}
- return res.status===204?null:res.json();
-}
 async function load(){
- if(online){
+ if(online&&auth.user){
   const from=localDate(monday),to=localDate(addDays(monday,7));
-  bookings=await api(`bookings?select=id,booking_date,start_hour,name,lab,notes&booking_date=gte.${from}&booking_date=lt.${to}&order=booking_date.asc,start_hour.asc`);
- }else{try{bookings=JSON.parse(localStorage.getItem(storageKey)||'[]')}catch{bookings=[]}}
+  const {data,error}=await client.from('bookings').select('id,booking_date,start_hour,name,lab,notes').gte('booking_date',from).lt('booking_date',to).order('booking_date',{ascending:true}).order('start_hour',{ascending:true});
+  if(error)throw error;bookings=data||[];
+ }else bookings=[];
  render();
 }
 function render(){
@@ -78,10 +73,13 @@ function render(){
  }
 }
 function openBooking(date,h){
+ if(!auth.user){auth.openAuth();return}
+ if(!auth.profile){alert('尚未取得會員資料，請確認已完成 Email 驗證，或重新登入。');return}
  selected={booking_date:date,start_hour:h};
  $('formMessage').textContent='';$('bookingForm').reset();
  $('bookingDate').min=localDate(new Date());$('bookingDate').max=localDate(addDays(new Date(),90));
  $('bookingDate').value=date;$('startTime').value=String(h);$('endTime').value=String(h+1);
+ $('bookingMember').textContent=`預約者：${auth.profile.full_name} · ${auth.profile.lab}（${auth.user.email}）`;
  updateRange();$('bookingDialog').showModal();
 }
 function showDetail(b){
@@ -93,29 +91,21 @@ function showDetail(b){
  $('detailDialog').showModal();
 }
 async function save(e){
- e.preventDefault();if(!selected)return;
+ e.preventDefault();if(!selected||!auth.user||!auth.profile)return;
  const range=updateRange();
  if(!range.valid){$('formMessage').textContent='請調整日期及時間，確認整段時間都可以預約。';return}
- const record={booking_date:range.date,start_hour:range.start,name:$('name').value.trim(),lab:$('lab').value.trim(),email:$('email').value.trim(),notes:$('notes').value.trim()};
- if(!record.name||!record.lab||!record.email)return;
  $('submitBooking').disabled=true;$('formMessage').textContent='';
  try{
-  if(online){
-   await api('rpc/create_booking_range',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({
-    p_date:range.date,p_start:range.start,p_end:range.end,p_name:record.name,p_lab:record.lab,p_email:record.email,p_notes:record.notes
-   })});
-  }else{
-   const all=JSON.parse(localStorage.getItem(storageKey)||'[]');
-   const conflict=all.some(b=>b.booking_date===range.date&&b.start_hour>=range.start&&b.start_hour<range.end);
-   if(conflict)throw Error('所選時間內已有其他預約');
-   const batch=Array.from({length:range.end-range.start},(_,i)=>({...record,start_hour:range.start+i,id:crypto.randomUUID()}));
-   localStorage.setItem(storageKey,JSON.stringify([...all,...batch]));
-  }
+  const {error}=await client.rpc('create_member_booking_range',{
+   p_date:range.date,p_start:range.start,p_end:range.end,p_notes:$('notes').value.trim()
+  });
+  if(error)throw error;
   $('bookingDialog').close();
-  monday=startMonday(new Date(range.date+'T12:00:00'));activeDay=(new Date(range.date+'T12:00:00').getDay()+6)%7;
+  monday=startMonday(new Date(range.date+'T12:00:00'));
+  activeDay=(new Date(range.date+'T12:00:00').getDay()+6)%7;
   await load();
  }catch(err){
-  $('formMessage').textContent=/duplicate|unique|conflict|already|已被|已有|時段衝突/i.test(err.message)?'所選時間已有預約，請調整起訖時間。':`預約失敗：${err.message}`;
+  $('formMessage').textContent=/duplicate|unique|conflict|already/i.test(err.message)?'所選時間已有預約，請調整起訖時間。':`預約失敗：${err.message}`;
   await load().catch(()=>{});updateRange();
  }finally{$('submitBooking').disabled=false}
 }
@@ -130,8 +120,8 @@ $('prev').onclick=()=>{monday=addDays(monday,-7);load().catch(showError)};
 $('next').onclick=()=>{monday=addDays(monday,7);load().catch(showError)};
 for(const [id,dialog] of [['closeBooking','bookingDialog'],['cancelBooking','bookingDialog'],['closeDetail','detailDialog'],['dismissDetail','detailDialog']])$(id).onclick=()=>$(dialog).close();
 function showError(e){$('status').textContent='● 資料讀取失敗';console.error(e);alert(`無法讀取預約資料：${e.message}`)}
-$('status').textContent=online?'● 雲端同步已啟用':'● 本機示範模式';
+window.addEventListener('lionheart-auth-change',()=>load().catch(showError));
 $('year').textContent=new Date().getFullYear();
 load().catch(showError);
-if(online){setInterval(()=>load().catch(console.error),30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load().catch(console.error)})}
+if(online){setInterval(()=>{if(auth.user)load().catch(console.error)},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&auth.user)load().catch(console.error)})}
 })();
