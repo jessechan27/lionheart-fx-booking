@@ -20,14 +20,25 @@ function updateRange(){
  return {valid:!!valid&&!inPast&&!conflicts.length,date,start,end};
 }
 for(const id of ['bookingDate','startTime','endTime'])$(id).addEventListener('change',updateRange);
+let loadSequence=0;
 async function load(){
- if(online&&auth.user){
-  const from=localDate(monday),to=localDate(addDays(monday,7));
-  const {data,error}=await client.from('bookings').select('id,booking_date,start_hour,name,lab,notes').gte('booking_date',from).lt('booking_date',to).order('booking_date',{ascending:true}).order('start_hour',{ascending:true});
-  if(error)throw error;bookings=data||[];
- }else bookings=[];
+ const sequence=++loadSequence;
+ const from=localDate(monday),to=localDate(addDays(monday,7));
+ if(!online){bookings=[];render();return}
+ // Public occupancy is visible before login; member details remain protected.
+ const {data:occupied,error:availabilityError}=await client.rpc('public_booking_availability',{p_from:from,p_to:localDate(addDays(monday,6))});
+ if(availabilityError)throw availabilityError;
+ let next=(occupied||[]).map(b=>({...b,occupied:true}));
+ if(auth.user){
+  const {data:details,error}=await client.from('bookings').select('id,booking_date,start_hour,name,lab,notes').gte('booking_date',from).lt('booking_date',to).order('booking_date',{ascending:true}).order('start_hour',{ascending:true});
+  if(error)throw error;
+  next=details||[];
+ }
+ if(sequence!==loadSequence)return;
+ bookings=next;
  render();
 }
+
 function render(){
  const last=addDays(monday,6);
  $('weekLabel').textContent=`${monday.getFullYear()}/${readable(monday)} — ${readable(last)}`;
@@ -58,9 +69,10 @@ function render(){
    const btn=mk('button',`slot ${found?'reserved':past?'past-slot':'available'}`);
    btn.type='button';
    if(found){
-    btn.append(mk('strong','',found.name),mk('small','',found.lab));
-    btn.setAttribute('aria-label',`${date} ${h}點 已預約 ${found.name}`);
-    btn.addEventListener('click',()=>showDetail(found));
+    btn.append(mk('strong','',found.name||'已預約'));
+    if(found.lab)btn.append(mk('small','',found.lab));
+    btn.setAttribute('aria-label',`${date} ${h}點 已預約`);
+    if(auth.user&&found.name)btn.addEventListener('click',()=>showDetail(found));
    }else if(past){btn.append(mk('small','','—'));btn.disabled=true}
    else{
     btn.append(mk('span','plus','＋'));
@@ -124,5 +136,5 @@ function showError(e){$('status').textContent='● 資料讀取失敗';console.e
 window.addEventListener('lionheart-auth-change',()=>load().catch(showError));
 $('year').textContent=new Date().getFullYear();
 load().catch(showError);
-if(online){setInterval(()=>{if(auth.user)load().catch(console.error)},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&auth.user)load().catch(console.error)})}
+if(online){setInterval(()=>{load().catch(console.error)},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load().catch(console.error)})}
 })();
