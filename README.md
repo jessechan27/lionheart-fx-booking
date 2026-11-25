@@ -88,8 +88,8 @@ on conflict (user_id) do nothing;
 
 **必要部署步驟：**
 1. 以**管理者 Google 帳號**登入 https://script.google.com →「新專案」，專案命名為 `Lionheart FX Mailer`。
-2. 刪除預設程式碼，貼上本 repo 的 `google_apps_script_mailer.gs` 全部內容，按儲存。
-3. 上方函式選單選 `setup` →「執行」→ 依提示授權（出現「Google 尚未驗證這個應用程式」時，按「進階」→「前往 Lionheart FX Mailer」；這是您自己的程式）。執行完成後：
+2. **刪除預設程式碼（包含 `function myFunction() {}`）**，貼上本 repo 的 `google_apps_script_mailer.gs` 全部內容，按 Ctrl+S 儲存。
+3. 確認「執行」右邊的函式選單選的是 `setup`（不是 `myFunction`）→「執行」→ 依提示授權（出現「Google 尚未驗證這個應用程式」時，按「進階」→「前往 Lionheart FX Mailer」；這是您自己的程式）。執行完成後：
    - 信箱會收到兩封測試信（管理者通知、核准通知）。
    - 下方「執行紀錄」會顯示 `MAILER_TOKEN`，請複製備用。
    - 管理者收件 Email 預設為部署者的 Gmail；如需更改，到「專案設定 → 指令碼屬性」修改 `ADMIN_EMAIL`。
