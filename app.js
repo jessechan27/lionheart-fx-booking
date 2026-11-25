@@ -30,7 +30,7 @@ async function load(){
  if(availabilityError)throw availabilityError;
  let next=(occupied||[]).map(b=>({...b,occupied:true}));
  if(auth.user){
-  const {data:details,error}=await client.from('bookings').select('id,booking_date,start_hour,name,lab,notes').gte('booking_date',from).lt('booking_date',to).order('booking_date',{ascending:true}).order('start_hour',{ascending:true});
+  const {data:details,error}=await client.from('bookings').select('id,booking_date,start_hour,name,lab,notes,user_id,booking_group').gte('booking_date',from).lt('booking_date',to).order('booking_date',{ascending:true}).order('start_hour',{ascending:true});
   if(error)throw error;
   next=details||[];
  }
@@ -91,16 +91,57 @@ function openBooking(date,h){
  $('bookingDate').min=localDate(new Date());$('bookingDate').max=localDate(addDays(new Date(),90));
  $('bookingDate').value=date;$('startTime').value=String(h);$('endTime').value=String(h+1);
  $('bookingMember').textContent=`預約者：${auth.profile.full_name} · ${auth.profile.lab}（${auth.user.email}）`;
+ $('extension').value=auth.profile.extension||'';// 自動帶入上次預約填寫的分機
  updateRange();$('bookingDialog').showModal();
 }
+const started=b=>new Date(`${b.booking_date}T${pad(b.start_hour)}:00:00`).getTime()<=Date.now();
+// 可取消的時段：管理者可取消任何預約；會員只能取消自己尚未開始的預約。伺服器端會再次檢查。
+function cancellableHours(b){
+ if(!auth.user||!b.id)return [];
+ if(!auth.isAdmin&&(b.user_id!==auth.user.id||started(b)))return [];
+ if(!b.booking_group)return [b];
+ return bookings.filter(x=>x.booking_group===b.booking_group&&(auth.isAdmin||!started(x)));
+}
+let detail=null;
 function showDetail(b){
+ detail=b;
  const body=$('detailBody');body.replaceChildren();
  for(const [label,value] of [['日期',b.booking_date],['使用時段',`${pad(b.start_hour)}:00–${pad(b.start_hour+1)}:00`],['使用者',b.name],['所屬單位',b.lab],['實驗備註',b.notes||'無']]){
   const line=document.createElement('div');line.className='detail-line';
   const cap=document.createElement('span');cap.textContent=label;line.append(cap,document.createTextNode(value));body.append(line);
  }
+ const hours=cancellableHours(b);
+ $('cancelHour').hidden=!hours.length;
+ $('cancelGroup').hidden=hours.length<2;
+ $('cancelGroup').textContent=`取消整段預約（${hours.length} 小時）`;
+ $('detailMessage').textContent='';
  $('detailDialog').showModal();
 }
+async function cancelDetail(entire){
+ const b=detail;if(!b)return;
+ const hours=entire?cancellableHours(b).length:1;
+ const whose=b.user_id===auth.user?.id?'您':`「${b.name}」（${b.lab}）`;
+ const what=entire?`同一次預約的 ${hours} 個小時`:`${pad(b.start_hour)}:00–${pad(b.start_hour+1)}:00 這一個小時`;
+ if(!confirm(`確定取消${whose}在 ${b.booking_date} ${what}？\n取消後時段會重新開放，此操作無法復原。`))return;
+ for(const id of ['cancelHour','cancelGroup'])$(id).disabled=true;
+ try{
+  const {data:count,error}=await client.rpc('cancel_booking',{p_booking:b.id,p_entire_group:entire});
+  if(error)throw error;
+  $('detailDialog').close();
+  await load();
+  if(!count)alert('此預約已不存在，可能已被取消。');
+ }catch(err){
+  const m=err.message||'';
+  $('detailMessage').textContent=/already started/i.test(m)?'此時段已開始或已過去，無法取消。'
+   :/own bookings/i.test(m)?'只能取消自己的預約。'
+   :/not found/i.test(m)&&!/function/i.test(m)?'此預約已不存在，請重新整理頁面。'
+   :/cancel_booking|function/i.test(m)?'取消功能尚未啟用，請管理者執行 cancel_booking_migration.sql。'
+   :`取消失敗：${m}`;
+  load().catch(()=>{});
+ }finally{for(const id of ['cancelHour','cancelGroup'])$(id).disabled=false}
+}
+$('cancelHour').onclick=()=>cancelDetail(false);
+$('cancelGroup').onclick=()=>cancelDetail(true);
 async function save(e){
  e.preventDefault();if(!selected||!auth.user||!auth.profile)return;
  const range=updateRange();
@@ -108,15 +149,19 @@ async function save(e){
  $('submitBooking').disabled=true;$('formMessage').textContent='';
  try{
   const {error}=await client.rpc('create_member_booking_range',{
-   p_date:range.date,p_start:range.start,p_end:range.end,p_notes:$('notes').value.trim()
+   p_date:range.date,p_start:range.start,p_end:range.end,p_extension:$('extension').value.trim(),p_notes:$('notes').value.trim()
   });
   if(error)throw error;
+  if(auth.profile)auth.profile.extension=$('extension').value.trim();
   $('bookingDialog').close();
   monday=startMonday(new Date(range.date+'T12:00:00'));
   activeDay=(new Date(range.date+'T12:00:00').getDay()+6)%7;
   await load();
  }catch(err){
-  $('formMessage').textContent=/duplicate|unique|conflict|already/i.test(err.message)?'所選時間已有預約，請調整起訖時間。':`預約失敗：${err.message}`;
+  $('formMessage').textContent=/duplicate|unique|conflict|already/i.test(err.message)?'所選時間已有預約，請調整起訖時間。'
+   :/campus extension/i.test(err.message)?'請輸入正確的校內分機（3–10 碼數字，可含 - 或 #）。'
+   :/p_extension|create_member_booking_range/i.test(err.message)?'系統尚未啟用分機欄位，請管理者執行 campus_extension_migration.sql。'
+   :`預約失敗：${err.message}`;
   await load().catch(()=>{});updateRange();
  }finally{$('submitBooking').disabled=false}
 }

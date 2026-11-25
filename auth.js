@@ -26,7 +26,7 @@ async function refresh(){
  const {data:{user:current},error}=await client.auth.getUser();
  if(error||!current){user=null;profile=null;profileErrorMessage='';isAdmin=false;updateUI();notify();return}
  user=current;
- const {data,error:profileError}=await client.from('profiles').select('full_name,lab,approval_status').eq('id',user.id).single();
+ const {data,error:profileError}=await client.from('profiles').select('full_name,lab,approval_status,extension').eq('id',user.id).single();
  profile=profileError?null:data;
  profileErrorMessage=profileError?(profileError.message||'無法讀取會員資料'):'';
  if(profileError)console.error('Lionheart member profile query failed:',profileError);

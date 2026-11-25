@@ -117,3 +117,30 @@ select id, status_code, error_msg, created from net._http_response order by crea
 - Gmail 個人帳號透過 Apps Script 每日最多寄給 100 位收件者。
 - 修改 `google_apps_script_mailer.gs` 後，須在 Apps Script「部署 → 管理部署作業」編輯並選「新版本」，網址不變。
 - 收不到信時，到 Apps Script 左側「執行項目」查看 `doPost` 紀錄：出現「MAILER_TOKEN 不符」代表步驟 6 的驗證碼與指令碼屬性不同；`net._http_response` 出現 401/403/404 多為部署時「誰可以存取」未選「所有人」或網址錯誤。
+
+## 取消預約（2026-11）
+登入後點選週曆上已預約的時段，「預約資訊」視窗會依權限顯示取消按鈕：
+- **會員**：可取消**自己**的預約，且限尚未開始的時段；已開始或已過去的時段不能取消。
+- **管理者**：可取消**任何會員**的預約（包含已過去的時段），與管理後台「預約紀錄管理」相同。
+- 「取消此小時」只取消該 1 小時；同一次預約有多個小時時，另有「取消整段預約（N 小時）」。會員取消整段時，只會取消其中尚未開始的時段。
+- 取消即刪除紀錄，時段立即重新開放，無法復原。權限由資料庫函式 `cancel_booking` 檢查，不能由前端繞過。
+
+**必要部署步驟（順序很重要）：**
+1. 先在 Supabase SQL Editor 執行 **`cancel_booking_migration.sql`**（需已執行 `supabase.sql` 與 `admin_migration.sql`）。
+2. 再推送前端（`index.html`、`app.js`、`styles.css`）到 GitHub。若先推前端、未執行 SQL，登入後的週曆會因無法讀取 `booking_group` 欄位而顯示讀取失敗。
+3. 測試：一般會員預約 2 小時 → 點選該時段 → 取消此小時 → 再取消整段；用另一位會員確認看不到取消按鈕；用管理者帳號取消他人預約。
+
+**注意：** 若之後重新執行 `supabase.sql`，它會重設 bookings 的欄位權限，請再執行一次 `cancel_booking_migration.sql`。
+
+## 預約必填校內分機（2026-11）
+- 新增預約表單增加「校內分機」必填欄位（3–10 碼，數字開頭，可含 `-` 或 `#`，例如 `1234`、`2203-15`）。前端與資料庫都會檢查，未填或格式錯誤無法預約。
+- 系統記住會員最近一次填寫的分機，下次預約自動帶入，可直接修改。
+- 分機只記錄在預約資料中，**不公開給其他會員**；管理後台「預約紀錄管理」表格及 CSV 匯出會顯示分機。
+- 既有的舊預約沒有分機，後台顯示「—」。
+
+**必要部署步驟（順序很重要）：**
+1. 在 Supabase SQL Editor 執行 **`campus_extension_migration.sql`**（需已執行 `supabase.sql` 與 `admin_migration.sql`）。
+2. 執行後立即推送前端（`index.html`、`app.js`、`auth.js`、`admin.html`、`admin.js`）。SQL 會移除舊版不含分機的預約函式，因此兩者之間的空檔，舊版網頁無法新增預約；反之若先推前端，登入時會讀不到會員資料。
+3. 測試：登入 → 新增預約，不填分機應無法送出 → 填入分機完成預約 → 再次新增預約，分機應自動帶入 → 管理後台確認分機欄位與 CSV。
+
+**注意：** 若之後重新執行 `supabase.sql` 或 `admin_migration.sql`，會還原為不含分機的舊版預約函式，請再執行一次 `campus_extension_migration.sql`。

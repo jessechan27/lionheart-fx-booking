@@ -80,9 +80,9 @@ function renderUsage(){
 }
 function renderBookings(){
  const rows=$('bookingRows');rows.replaceChildren();
- if(!bookings.length){const r=document.createElement('tr');cell(r,'統計期間沒有預約紀錄').colSpan=6;rows.append(r);return}
+ if(!bookings.length){const r=document.createElement('tr');cell(r,'統計期間沒有預約紀錄').colSpan=7;rows.append(r);return}
  for(const b of bookings){
-  const r=document.createElement('tr');cell(r,b.booking_date);cell(r,`${String(b.start_hour).padStart(2,'0')}:00–${String(b.start_hour+1).padStart(2,'0')}:00`);cell(r,b.name);cell(r,b.lab);cell(r,b.notes||'—');
+  const r=document.createElement('tr');cell(r,b.booking_date);cell(r,`${String(b.start_hour).padStart(2,'0')}:00–${String(b.start_hour+1).padStart(2,'0')}:00`);cell(r,b.name);cell(r,b.lab);cell(r,b.extension||'—');cell(r,b.notes||'—');
   const action=cell(r,'');action.append(button('取消此小時',()=>cancelBooking(b,false)));
   if(b.booking_group)action.append(button('取消整段',()=>cancelBooking(b,true)));
   rows.append(r);
@@ -101,7 +101,7 @@ function csvExport(filename,columns,data){
  const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 $('exportUsage').onclick=()=>csvExport('lionheart_lab_usage.csv',[['實驗室','lab'],['使用時數','hours'],['使用人數','users']],usage);
-$('exportBookings').onclick=()=>csvExport('lionheart_bookings.csv',[['日期','booking_date'],['開始時間','start_hour'],['姓名','name'],['實驗室','lab'],['Email','email'],['備註','notes']],bookings);
+$('exportBookings').onclick=()=>csvExport('lionheart_bookings.csv',[['日期','booking_date'],['開始時間','start_hour'],['姓名','name'],['實驗室','lab'],['校內分機','extension'],['Email','email'],['備註','notes']],bookings);
 $('memberFilter').onchange=renderMembers;
 $('refreshAdmin').onclick=refresh;
 $('adminLogin').onsubmit=async e=>{
