@@ -78,3 +78,35 @@ on conflict (user_id) do nothing;
 6. 測試一般會員註冊後為待審核、管理員核准後才能預約；測試報表及取消預約。
 
 **注意：** 未設定 Supabase 或尚未執行管理者 migration 時，後台不會正常運作。管理者後台的權限判斷在資料庫執行，並非只靠隱藏前端按鈕。既有會員預設為待審核，須逐一核准。取消預約為刪除紀錄，目前未提供稽核日誌或復原功能。使用時數為預約時數，非實際儀器運轉紀錄。
+
+## 新會員申請：記錄申請時間與 Email 通知管理者（2026-11）
+- **記錄申請時間**：每位會員的 `profiles.requested_at` 記錄申請預約權限（註冊）的時間；管理後台「會員審核」表格新增「申請時間」欄（台灣時間），依申請時間由新到舊排序。既有會員以帳號建立時間補上。
+- **Email 通知**：有新使用者註冊時，系統自動寄信給管理者，信中註明「有新使用者需要管理者核准」，並附上姓名、實驗室／單位、Email、申請時間及管理後台連結。
+
+運作方式：使用者註冊後建立 `profiles`（狀態為待審核），資料庫觸發器透過 Supabase `pg_net` 呼叫 [Resend](https://resend.com) Email API 寄信。寄信在背景送出，**寄信失敗不會影響使用者註冊**。前端不會暴露任何金鑰或管理者 Email。
+
+**必要部署步驟：**
+1. 到 https://resend.com 以**管理者收件信箱**註冊免費帳號（未驗證自有網域時，Resend 只能寄到註冊帳號本人的信箱）。
+2. Resend → **API Keys** → Create API Key（權限選 Sending access 即可），複製 `re_` 開頭的金鑰。
+3. 在 Supabase SQL Editor 執行 **`new_member_application_migration.sql`**（需已執行 `supabase.sql` 與 `admin_migration.sql`）。執行後「申請時間」即開始記錄；若之後重新執行 `admin_migration.sql`，請再執行一次本檔。
+4. 在 Supabase SQL Editor 執行以下指令，將金鑰與收件 Email 存入 Supabase Vault（不會出現在 GitHub）：
+
+```sql
+select lionheart_private.set_notification_settings('re_您的ResendAPIKey', '管理者收件Email');
+```
+
+5. 寄測試信並確認結果：
+
+```sql
+select lionheart_private.send_member_notification('測試使用者', '測試實驗室', 'test@example.com');
+-- 數秒後查詢，status_code 為 200 代表 Resend 已接受寄送
+select id, status_code, content, error_msg, created from net._http_response order by created desc limit 5;
+```
+
+6. 用一個新 Email 在網站註冊，確認管理者信箱收到通知。第一次收信若在垃圾郵件匣，請標記為「非垃圾郵件」。
+
+**注意：**
+- 通知在使用者送出註冊時寄出，此時對方可能尚未完成 Email 驗證；完成驗證前對方無法登入。
+- 更換金鑰或收件 Email：再次執行步驟 4 即可覆寫。
+- Resend 免費方案每日 100 封、每月 3,000 封。若日後驗證自有網域，可將 SQL 中寄件者 `onboarding@resend.dev` 改為自有網域地址，並可寄給多位管理者。
+- 收不到信時，先以步驟 5 查詢 `net._http_response`：401/403 多為金鑰錯誤，422 多為收件信箱不是 Resend 帳號本人信箱。

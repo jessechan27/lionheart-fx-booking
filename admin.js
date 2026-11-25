@@ -11,6 +11,7 @@ const setStatus=(msg,error=false)=>{$('adminStatus').textContent=msg;$('adminSta
 const cell=(row,value)=>{const el=document.createElement('td');el.textContent=value==null?'':String(value);row.append(el);return el};
 const button=(label,fn,variant='secondary')=>{const b=document.createElement('button');b.type='button';b.className=variant+' admin-small';b.textContent=label;b.onclick=fn;return b};
 const statusLabel={pending:'待審核',approved:'已核准',rejected:'已拒絕'};
+const formatTime=v=>{if(!v)return '—';const d=new Date(v);return isNaN(d)?'—':d.toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})};
 async function rpc(name,args={}){const {data,error}=await client.rpc(name,args);if(error)throw error;return data}
 function showGate(message){authorized=false;$('adminGate').hidden=false;$('adminDashboard').hidden=true;$('adminLogout').hidden=true;$('gateMessage').textContent=message||'請使用管理者帳號登入。'}
 async function verify(){
@@ -41,9 +42,11 @@ function renderMembers(){
  $('pendingCount').textContent=members.filter(x=>x.status==='pending').length+' 人';
  const rows=$('memberRows');rows.replaceChildren();
  const list=members.filter(x=>$('memberFilter').value==='all'||x.status===$('memberFilter').value);
- if(!list.length){const r=document.createElement('tr');cell(r,'目前沒有符合條件的會員').colSpan=5;rows.append(r);return}
+ if(!list.length){const r=document.createElement('tr');cell(r,'目前沒有符合條件的會員').colSpan=6;rows.append(r);return}
  for(const m of list){
   const r=document.createElement('tr');cell(r,m.full_name+(m.is_admin?'（管理者）':''));cell(r,m.lab);cell(r,m.email);
+  // 申請權限時間；尚未執行 new_member_application_migration.sql 時以帳號建立時間代替。
+  cell(r,formatTime(m.requested_at||m.created_at)).style.whiteSpace='nowrap';
   cell(r,statusLabel[m.status]||m.status);
   const action=cell(r,'');
   if(!m.is_admin){
