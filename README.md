@@ -79,34 +79,41 @@ on conflict (user_id) do nothing;
 
 **注意：** 未設定 Supabase 或尚未執行管理者 migration 時，後台不會正常運作。管理者後台的權限判斷在資料庫執行，並非只靠隱藏前端按鈕。既有會員預設為待審核，須逐一核准。取消預約為刪除紀錄，目前未提供稽核日誌或復原功能。使用時數為預約時數，非實際儀器運轉紀錄。
 
-## 新會員申請：記錄申請時間與 Email 通知管理者（2026-11）
-- **記錄申請時間**：每位會員的 `profiles.requested_at` 記錄申請預約權限（註冊）的時間；管理後台「會員審核」表格新增「申請時間」欄（台灣時間），依申請時間由新到舊排序。既有會員以帳號建立時間補上。
-- **Email 通知**：有新使用者註冊時，系統自動寄信給管理者，信中註明「有新使用者需要管理者核准」，並附上姓名、實驗室／單位、Email、申請時間及管理後台連結。
+## 新會員申請：申請時間記錄與 Email 通知（2026-11）
+- **記錄申請時間**：每位會員的 `profiles.requested_at` 記錄申請預約權限（註冊）的時間；管理後台「會員審核」表格顯示「申請時間」（台灣時間），依申請時間由新到舊排序。既有會員以帳號建立時間補上。
+- **通知管理者**：有新使用者註冊時，寄信給管理者，信中註明「有新使用者需要管理者核准」，附姓名、實驗室／單位、Email、申請時間及管理後台連結。
+- **通知使用者**：管理者在後台按「核准」後，寄信給該使用者。主旨「Lionheart FX註冊申請通過」，內文「（使用者姓名）您好，您申請之Lionheart FX使用帳號業已通過，可以開始使用預約系統。」署名「中醫藥核心平台實驗室」。
 
-運作方式：使用者註冊後建立 `profiles`（狀態為待審核），資料庫觸發器透過 Supabase `pg_net` 呼叫 [Resend](https://resend.com) Email API 寄信。寄信在背景送出，**寄信失敗不會影響使用者註冊**。前端不會暴露任何金鑰或管理者 Email。
+運作方式：Supabase 資料庫觸發器透過 `pg_net` 呼叫管理者自己的 Google Apps Script（`google_apps_script_mailer.gs`），由管理者的 Gmail 寄出，寄件人顯示為「中醫藥核心平台實驗室」。不需要自有網域或其他寄信服務。寄信在背景送出，**寄信失敗不會影響註冊或審核**。前端不會暴露驗證碼或管理者 Email。
 
 **必要部署步驟：**
-1. 到 https://resend.com 以**管理者收件信箱**註冊免費帳號（未驗證自有網域時，Resend 只能寄到註冊帳號本人的信箱）。
-2. Resend → **API Keys** → Create API Key（權限選 Sending access 即可），複製 `re_` 開頭的金鑰。
-3. 在 Supabase SQL Editor 執行 **`new_member_application_migration.sql`**（需已執行 `supabase.sql` 與 `admin_migration.sql`）。執行後「申請時間」即開始記錄；若之後重新執行 `admin_migration.sql`，請再執行一次本檔。
-4. 在 Supabase SQL Editor 執行以下指令，將金鑰與收件 Email 存入 Supabase Vault（不會出現在 GitHub）：
+1. 以**管理者 Google 帳號**登入 https://script.google.com →「新專案」，專案命名為 `Lionheart FX Mailer`。
+2. 刪除預設程式碼，貼上本 repo 的 `google_apps_script_mailer.gs` 全部內容，按儲存。
+3. 上方函式選單選 `setup` →「執行」→ 依提示授權（出現「Google 尚未驗證這個應用程式」時，按「進階」→「前往 Lionheart FX Mailer」；這是您自己的程式）。執行完成後：
+   - 信箱會收到兩封測試信（管理者通知、核准通知）。
+   - 下方「執行紀錄」會顯示 `MAILER_TOKEN`，請複製備用。
+   - 管理者收件 Email 預設為部署者的 Gmail；如需更改，到「專案設定 → 指令碼屬性」修改 `ADMIN_EMAIL`。
+4. 右上角「部署」→「新增部署作業」→ 類型選「網頁應用程式」；**執行身分：我**；**誰可以存取：所有人** →「部署」，複製「網頁應用程式網址」（`/exec` 結尾）。
+5. 在 Supabase SQL Editor 執行 **`new_member_application_migration.sql`**（需已執行 `supabase.sql` 與 `admin_migration.sql`）。若之後重新執行 `admin_migration.sql`，請再執行一次本檔。
+6. 在 Supabase SQL Editor 執行（換成步驟 4 的網址與步驟 3 的 MAILER_TOKEN；會存入 Supabase Vault，不會出現在 GitHub）：
 
 ```sql
-select lionheart_private.set_notification_settings('re_您的ResendAPIKey', '管理者收件Email');
+select lionheart_private.set_mailer_settings('https://script.google.com/macros/s/……/exec', '您的MAILER_TOKEN');
 ```
 
-5. 寄測試信並確認結果：
+7. 從資料庫寄測試信並確認：
 
 ```sql
-select lionheart_private.send_member_notification('測試使用者', '測試實驗室', 'test@example.com');
--- 數秒後查詢，status_code 為 200 代表 Resend 已接受寄送
-select id, status_code, content, error_msg, created from net._http_response order by created desc limit 5;
+select lionheart_private.send_mail(jsonb_build_object('type','approved','name','測試使用者','email','您的Email'));
+-- 數秒後查詢：status_code 為 302 或 200 代表已送達 Apps Script
+select id, status_code, error_msg, created from net._http_response order by created desc limit 5;
 ```
 
-6. 用一個新 Email 在網站註冊，確認管理者信箱收到通知。第一次收信若在垃圾郵件匣，請標記為「非垃圾郵件」。
+8. 用一個新 Email 在網站註冊 → 確認管理者收到通知 → 在後台核准 → 確認該 Email 收到「Lionheart FX註冊申請通過」。
 
 **注意：**
-- 通知在使用者送出註冊時寄出，此時對方可能尚未完成 Email 驗證；完成驗證前對方無法登入。
-- 更換金鑰或收件 Email：再次執行步驟 4 即可覆寫。
-- Resend 免費方案每日 100 封、每月 3,000 封。若日後驗證自有網域，可將 SQL 中寄件者 `onboarding@resend.dev` 改為自有網域地址，並可寄給多位管理者。
-- 收不到信時，先以步驟 5 查詢 `net._http_response`：401/403 多為金鑰錯誤，422 多為收件信箱不是 Resend 帳號本人信箱。
+- 新會員通知在使用者送出註冊時寄出，此時對方可能尚未完成 Email 驗證；完成驗證前對方無法登入。
+- 停用後再次核准，會再寄一次核准通知信。管理者帳號不會收到核准通知。
+- Gmail 個人帳號透過 Apps Script 每日最多寄給 100 位收件者。
+- 修改 `google_apps_script_mailer.gs` 後，須在 Apps Script「部署 → 管理部署作業」編輯並選「新版本」，網址不變。
+- 收不到信時，到 Apps Script 左側「執行項目」查看 `doPost` 紀錄：出現「MAILER_TOKEN 不符」代表步驟 6 的驗證碼與指令碼屬性不同；`net._http_response` 出現 401/403/404 多為部署時「誰可以存取」未選「所有人」或網址錯誤。

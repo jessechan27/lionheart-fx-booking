@@ -59,7 +59,8 @@ function renderMembers(){
 }
 async function setMember(m,status){
  const label=statusLabel[status];
- if(!confirm(`確定將「${m.full_name}」（${m.lab}）設為「${label}」？`))return;
+ const mailNote=status==='approved'?`\n\n核准後系統將寄送「Lionheart FX註冊申請通過」通知信至 ${m.email}。`:'';
+ if(!confirm(`確定將「${m.full_name}」（${m.lab}）設為「${label}」？${mailNote}`))return;
  try{await rpc('admin_set_member_status',{p_user:m.id,p_status:status});await refresh()}
  catch(err){alert('會員狀態更新失敗：'+err.message)}
 }
