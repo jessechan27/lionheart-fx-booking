@@ -18,7 +18,8 @@
 @media(max-width:700px){.top{align-items:flex-start}.account-actions{max-width:55%;gap:6px}.account-actions .status{max-width:100%;white-space:normal;text-align:right}.account-actions .secondary{padding:8px 10px}.user-badge{padding:7px 9px}.auth-tabs{margin-top:4px}}
 
 /* CMU valuable instrument information */
-.instrument-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0 14px;max-width:760px}
+.instrument-info{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:20px 0 14px;max-width:1060px}
+@media(max-width:900px){.instrument-info{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .instrument-info>div{display:flex;flex-direction:column;gap:5px;padding:13px 16px;background:rgba(255,255,255,.75);border:1px solid rgba(140,140,155,.17);border-radius:12px}
 .instrument-info span{font-size:12px;color:#74747d;font-weight:500}
 .instrument-info strong{font-size:15px;font-weight:650;line-height:1.5;color:#24242a}
