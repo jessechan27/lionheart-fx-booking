@@ -36,4 +36,4 @@
 .hours-chip span,.hours-chip small{color:#86868b;font-size:12px}
 .hours-chip b{font-weight:650;letter-spacing:-.2px;color:#1d1d1f}
 @media(max-width:700px){.hours-chip{grid-column:1/-1;justify-content:center;padding:11px 14px}}
-.footer-credit{font-size:1.5em}
+.footer-credit{font-size:1.3em}
