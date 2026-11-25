@@ -42,9 +42,7 @@ async function load(){
 function render(){
  const last=addDays(monday,6);
  $('weekLabel').textContent=`${monday.getFullYear()}/${readable(monday)} — ${readable(last)}`;
- $('weekRange').textContent=`${readable(monday)} – ${readable(last)}`;
  const weekDates=Array.from({length:7},(_,i)=>localDate(addDays(monday,i)));
- $('weeklyCount').textContent=`${bookings.filter(b=>weekDates.includes(b.booking_date)).length} 筆`;
  const nav=$('mobileDayNav');nav.replaceChildren();
  weekDates.forEach((date,i)=>{
   const b=document.createElement('button');b.type='button';b.className='day-pill'+(activeDay===i?' active':'');
